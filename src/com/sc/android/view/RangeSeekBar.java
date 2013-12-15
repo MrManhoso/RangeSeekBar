@@ -1,5 +1,8 @@
 package com.sc.android.view;
 
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Vector;
 
@@ -15,6 +18,8 @@ import android.view.View;
 
 public class RangeSeekBar extends View {
 
+	// Is fork
+	
 	private static final String TAG = "RangeSeekBar";
 	
 	public static final int HORIZONTAL = 0;
@@ -44,6 +49,8 @@ public class RangeSeekBar extends View {
 	private Drawable thumb;
 	
 	private boolean firstRun;
+	
+	private Iterator<Thumb> thumbsIterator;
 	
 	private void init(Context context) {
 		orientation = HORIZONTAL;
@@ -445,9 +452,10 @@ public class RangeSeekBar extends View {
     	            area1.bottom = getMeasuredHeight() - getPaddingBottom();
     	            //Log.d(TAG,"th: "+area1.toString());
 	    		}
-	            
-	    		thumb.setBounds(area1);
-	    		thumb.draw(canvas);    
+	            if(area1 != null && thumb != null){
+	            	thumb.setBounds(area1);
+	    			thumb.draw(canvas);
+	            }
         	}
     	}
     }
@@ -522,10 +530,12 @@ public class RangeSeekBar extends View {
     public class Thumb {
     	public float val;
     	public float pos;
+    	private final int id;
 
     	public Thumb() {
     		val = 0;
     		pos = 0;
+    		id = thumbs.size();
     	}
     }
 
@@ -625,5 +635,95 @@ public class RangeSeekBar extends View {
         	thumbs.add(th);
         }
 	}
+	
+	public int getThumbId(int index) {
+		return thumbs.get(index).id;
+	}
+	
+	/***
+	 * 
+	 * @return index of the new thumb
+	 */
+	public int addNewThumb(){
+		Thumb th = new Thumb();
+		thumbs.add(th);
+		return (thumbs.size()-1);
+	}
+	
+	/***
+	 * 
+	 * @param value
+	 * @return index of the new thumb
+	 */
+	public int addNewThumb(float value){
+		Thumb th = new Thumb();
+		thumbs.add(th);
+		setThumbValue(thumbs.size()-1, value);
+		return (thumbs.size()-1);
+	}
+	
+	
+	/***
+	 * should be used before adding new thumb to calculate the most appropriate value to give the thumb
+	 * @return float value for thumb
+	 */
+	public float getStartValueForNewThumb(){
+		// Sort the thumbs first
+		sortThumbs();
+		float value = 0.0f;
+		float maxDistance = 0.0f;
+		int index = 0;
+		// No thumbs return middle
+		if(thumbs.isEmpty()){
+			return getScaleRangeMax()/2;
+		}
+		try{
+			float startVal = 0.0f;
+			float currValue = getThumbValue(index++);
+			// Compare last element to minscalerange
+			if(currValue - getScaleRangeMin() > maxDistance){
+				maxDistance = currValue - getScaleRangeMin();
+				startVal = getScaleRangeMin();
+			}
+			while(true){
+				try{
+					float compValue = getThumbValue(index);
+					if(compValue - currValue > maxDistance){
+						maxDistance = compValue - currValue;
+						startVal = currValue;
+					}
+					currValue = compValue;
+					index++;
+				} catch(ArrayIndexOutOfBoundsException ex){
+					// Compare last element to maxscalerange
+					if(getScaleRangeMax() - currValue > maxDistance){
+						maxDistance = getScaleRangeMax() - currValue;
+						startVal = currValue;					
+					}
+					break;
+				}
+			}
+			value = startVal + (maxDistance/2);
+		} catch(ArrayIndexOutOfBoundsException ex){
+			// Got the last existing thumb 
+		}
+		return value;
+	}
+	
+	/***
+	 * sorts the list of thumbs according to their value
+	 */
+	public void sortThumbs(){
+		ThumbvalueComparator com = new ThumbvalueComparator();
+	    Collections.sort(thumbs, com);
+	}
+	
+    private class ThumbvalueComparator implements Comparator<Thumb> {
+
+    	@Override
+    	public int compare(Thumb t1, Thumb t2) {
+    		return (t1.val <= t2.val) ? -1 : 1;
+    	}
+    }
 	
 }
